@@ -191,9 +191,15 @@ local graph_and_lifeline = Def.ActorFrame{
 	Def.ActorMultiVertex{
 		Name="LifeLine_AMV",
 		InitCommand=function(self)
-			self:SetDrawState({Mode="DrawMode_LineStrip"})
-				:SetLineWidth( LifeLineThickness )
-				:align(0, 0)
+			local mode = "DrawMode_LineStrip"
+			local width = LifeLineThickness
+
+			if IsSMVersion(5, 3) then
+				mode = "DrawMode_LineStripM"
+				width = width * DISPLAY:GetDisplayHeight() / SCREEN_HEIGHT
+			end
+
+			self:SetDrawState({Mode=mode}):SetLineWidth(width):align(0, 0)
 		end,
 		UpdateCommand=function(self)
 			if GAMESTATE:GetCurMusicSeconds() > 0 then

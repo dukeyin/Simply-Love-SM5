@@ -1,7 +1,12 @@
 local player = ...
 local pn = ToEnumShortString(player)
-local playerString = "Player"..pn.."%sX"
+local mods = SL[pn].ActiveModifiers
 --Visual display of deviance values. 
+
+-- don't allow MeasureCounter to appear in Casual gamemode via profile settings
+if SL.Global.GameMode == "Casual" or not mods.ErrorBar then
+	return
+end
 
 local jcT = {}
 
@@ -19,22 +24,27 @@ local dvCur
 local jdgCur
 -- Note: only for judgments with OFFSETS, might reorganize a bit later
 
-local isCentered = PREFSMAN:GetPreference("Center1Player")
-local CenterX = SCREEN_CENTER_X
-if not isCentered then
-	CenterX = THEME:GetMetric("ScreenGameplay",string.format(playerString,ToEnumShortString(GAMESTATE:GetCurrentStyle():GetStyleType())))
-end
-
 -- User Parameters
 --==--==--==--==--==--==--==--==--==--==--==--==--==--==--==--==--==--==--==--==--==--==--==--==--==--==--==--==--==--==--==--==--==--==--
 local barcount = 30 									-- Number of bars. Older bars will refresh if judgments/barDuration exceeds this value. You don't need more than 40.
-local frameX = CenterX 									-- X Positon (Center of the bar)
-local frameY = SCREEN_CENTER_Y					        -- Y Positon (Center of the bar)
+local frameX = GetNotefieldX(player)					-- X Positon (Center of the bar)
+local frameY = _screen.cy					        -- Y Positon (Center of the bar)
 local frameHeight = 10 									-- Height of the bar
 local frameWidth = 240                               	-- Width of the bar
 local barWidth = 2										-- Width of the ticks.
 local barDuration = 0.75 								-- Time duration in seconds before the ticks fade out. Doesn't need to be higher than 1. Maybe if you have 300 bars I guess.
+
+if SL[pn].ActiveModifiers.JudgmentGraphic == "None" then
+	-- Display the error bar instead of the judgments if they are disabled.
+	frameY = _screen.cy - 30
+	frameHeight = 30
+elseif mods.MeasureCounter ~= "None" and not mods.MeasureCounterUp then
+	-- Move the error bar up if it would overlap with the measure counter.
+	frameY = frameY - 55
+end
 --==--==--==--==--==--==--==--==--==--==--==--==--==--==--==--==--==--==--==--==--==--==--==--==--==--==--==--==--==--==--==--==--==--==--
+
+
 
 local wscale = 500 							-- so we aren't calculating it over and over again
 local currentbar = 1 									-- so we know which error bar we need to update
@@ -79,7 +89,7 @@ local e = Def.ActorFrame{
             ingots[currentbar]:playcommand("UpdateErrorBar")
 		end
 	end,
-       
+
 	DootCommand=function(self)
 		self:RemoveChild("DestroyMe")
 		self:RemoveChild("DestroyMe2")
@@ -126,7 +136,4 @@ for i=1,barcount do
 	e[#e+1] = smeltErrorBar(i)
 end
 
--- Add the completed errorbar frame to the primary actor frame t if enabled
-if not SL[pn].ActiveModifiers.HideErrorBar then
-    return e
-end
+return e

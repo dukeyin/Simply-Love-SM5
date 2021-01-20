@@ -33,7 +33,8 @@ local PlayerDefaults = {
 				LifeMeterType = "Standard",
 				MissBecauseHeld = false,
 				NPSGraphAtTop = false,
-				ErrorBar = false,
+				ErrorBarPoog = false,
+				ErrorBarWF = false,
 			}
 			self.Streams = {
 				SongDir = nil,

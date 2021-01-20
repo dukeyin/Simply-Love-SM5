@@ -6,7 +6,7 @@ local mods = SL[pn].ActiveModifiers
 --if mods.EarlyLate == "Disabled" then return end
 
 -- don't allow MeasureCounter to appear in Casual gamemode via profile settings
-if SL.Global.GameMode == "Casual" or not mods.ErrorBar then
+if SL.Global.GameMode == "Casual" or not mods.ErrorBarWF then
 	return
 end
 
@@ -31,6 +31,15 @@ local faplusmod = 0
 --    threshold = 0
 --end
 
+local ypos = _screen.cy
+if SL[pn].ActiveModifiers.JudgmentGraphic == "None" then
+	-- Display the error bar instead of the judgments if they are disabled.
+        ypos = _screen.cy - 30
+elseif mods.MeasureCounter ~= "None" and not mods.MeasureCounterUp then
+	-- Move the error bar up if it would overlap with the measure counter.
+        ypos = _screen.cy - 55
+end
+
 -- 🛹
 -- one way of drawing these quads would be to just draw them centered, back to front, with the full width of the
 -- corresponding window. this would look bad if we want to alpha blend them though, so i'm drawing the segments
@@ -38,7 +47,7 @@ local faplusmod = 0
 local af = Def.ActorFrame{
     InitCommand = function(self)
         local reverse = GAMESTATE:GetPlayerState(player):GetPlayerOptions("ModsLevel_Preferred"):UsingReverse()
-        self:xy(GetNotefieldX(player), _screen.cy - 12)
+        self:xy(GetNotefieldX(player), ypos)
         self:zoom(0)
     end
 }
@@ -124,7 +133,7 @@ af.JudgmentMessageCommand = function(self, params)
             local tick = self:GetChild("TonyHawkTick" .. currentTick)
             tick:finishtweening():diffusealpha(1)
             tick:x(math.max(math.min((params.TapNoteOffset / wedge) * mwidth, mwidth + 4), -mwidth - 4))
-            tick:linear(2):diffusealpha(0)
+            tick:linear(0.75):diffusealpha(0)
 
             currentTick = currentTick + 1
             if currentTick > #ticks then

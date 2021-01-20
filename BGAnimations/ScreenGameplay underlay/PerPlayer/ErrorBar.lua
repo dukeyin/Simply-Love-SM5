@@ -4,7 +4,7 @@ local mods = SL[pn].ActiveModifiers
 --Visual display of deviance values. 
 
 -- don't allow MeasureCounter to appear in Casual gamemode via profile settings
-if SL.Global.GameMode == "Casual" or not mods.ErrorBar then
+if SL.Global.GameMode == "Casual" or not mods.ErrorBarPoog then
 	return
 end
 

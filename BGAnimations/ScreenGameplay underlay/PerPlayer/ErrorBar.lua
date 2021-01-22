@@ -1,6 +1,7 @@
 local player = ...
 local pn = ToEnumShortString(player)
 local mods = SL[pn].ActiveModifiers
+local gmods = SL.Global.ActiveModifiers
 --Visual display of deviance values. 
 
 -- don't allow MeasureCounter to appear in Casual gamemode via profile settings
@@ -45,41 +46,61 @@ end
 --==--==--==--==--==--==--==--==--==--==--==--==--==--==--==--==--==--==--==--==--==--==--==--==--==--==--==--==--==--==--==--==--==--==--
 
 
+local function getWindow(n)
+    local prefs = SL.Preferences[SL.Global.GameMode]
+    return prefs["TimingWindowSecondsW"..n] + prefs["TimingWindowAdd"]
+end
 
-local wscale = 500 							-- so we aren't calculating it over and over again
-local currentbar = 1 									-- so we know which error bar we need to update
-local ingots = {}										-- references to the error bars
+local enabledTimingWindows = {}
+
+for i=1, 5 do
+    if gmods.TimingWindows[i] then
+        enabledTimingWindows[#enabledTimingWindows+1] = i
+    end
+end
+
+local maxTimingOffset = getWindow(enabledTimingWindows[#enabledTimingWindows])
+local wscale = frameWidth / 2 / maxTimingOffset -- so we aren't calculating it over and over again
+local currentbar = 1                            -- so we know which error bar we need to update
+local ingots = {}		                -- references to the error bars
 
 -- Makes the error bars. They position themselves relative to the center of the screen based on your dv and diffuse to your judgement value before disappating or refreshing
 -- Should eventually be handled by the game itself to optimize performance
 local function smeltErrorBar(index)
-	return Def.Quad{
-		Name = index,
+    return Def.Quad{
+        Name = index,
         InitCommand=function(self)
-            self:xy(frameX,frameY):zoomto(barWidth,frameHeight):diffusealpha(0)
+            self:zoomto(barWidth,frameHeight):diffusealpha(0)
         end,
-		UpdateErrorBarCommand=function(self)						-- probably a more efficient way to achieve this effect, should test stuff later
-			self:finishtweening()									-- note: it really looks like shit without the fade out 
+        UpdateErrorBarCommand=function(self)						-- probably a more efficient way to achieve this effect, should test stuff later
+            self:finishtweening()									-- note: it really looks like shit without the fade out
             self:diffusealpha(1)
             :diffuse(jdgT[jdgCur])
-            :x(frameX+dvCur*wscale)
+            :x(dvCur*wscale)
             :linear(barDuration)
-			:diffusealpha(0)
-		end
-	}
+            :diffusealpha(0)
+        end
+    }
 end
 
 local e = Def.ActorFrame{
     InitCommand = function(self)
         -- basically the equivalent of using GetChildren() if it returned unnamed children numerically indexed
-		for i=1,barcount do
-			ingots[#ingots+1] = self:GetChild(i)
-		end
+        for i=1,barcount do
+                ingots[#ingots+1] = self:GetChild(i)
+        end
+        self:xy(frameX, frameY)
     end,
     JudgmentMessageCommand=function(self, params)
-		if params.Player ~= player then return end
-		if params.HoldNoteScore then return end
-        if params.TapNoteScore == "TapNoteScore_Miss" then return end
+        if params.Player ~= player then return end
+        if params.HoldNoteScore then return end
+        if params.TapNoteScore == "TapNoteScore_AvoidMine" or
+           params.TapNoteScore == "TapNoteScore_HitMine" or
+           params.TapNoteScore == "TapNoteScore_CheckpointHit" or
+           params.TapNoteScore == "TapNoteScore_CheckpointMiss" or
+           params.TapNoteScore == "TapNoteScore_Miss" then
+            return
+        end
 
         if params.TapNoteOffset then
             jdgCur = params.TapNoteScore
@@ -87,53 +108,86 @@ local e = Def.ActorFrame{
             currentbar = ((currentbar)%barcount) + 1
             -- Update the next bar in the queue
             ingots[currentbar]:playcommand("UpdateErrorBar")
-		end
-	end,
+        end
+    end,
 
-	DootCommand=function(self)
-		self:RemoveChild("DestroyMe")
-		self:RemoveChild("DestroyMe2")
-	end,
+    DootCommand=function(self)
+        self:RemoveChild("DestroyMe")
+        self:RemoveChild("DestroyMe2")
+    end,
 
-	-- Centerpiece
-	Def.Quad{
+    -- Background
+    Def.Quad{
         InitCommand=function(self)
-            self:diffuse(color(.5,.5,.5,1))
-            :xy(frameX,frameY)
-            :zoomto(2,frameHeight)
+            self:zoomto(frameWidth+2, frameHeight+2)
+            self:diffuse(color("#000000"))
+            self:diffusealpha(.5)
         end
     },
 
-	-- Indicates which side is which (early/late) These should be destroyed after the song starts.
-	LoadFont("Common Normal") .. {
-		Name = "DestroyMe",
+    -- Centerpiece
+    Def.Quad{
         InitCommand=function(self)
-            self:xy(frameX+frameWidth/4,frameY)
+            self:diffuse(color(.5,.5,.5,1)):zoomto(2,frameHeight)
+        end
+    },
+
+    -- Indicates which side is which (early/late) These should be destroyed after the song starts.
+    LoadFont("Common Normal") .. {
+        Name = "DestroyMe",
+        InitCommand=function(self)
+            self:x(frameWidth/4):zoom(0.7)
         end,
         BeginCommand=function(self)
             self:settext("Late")
             :diffusealpha(0):smooth(.5):diffusealpha(1):sleep(2):smooth(.5):diffusealpha(0)
         end
-	},
-	LoadFont("Common Normal") .. {
-		Name = "DestroyMe2",
+    },
+    LoadFont("Common Normal") .. {
+        Name = "DestroyMe2",
         InitCommand=function(self)
-            self:xy(frameX-frameWidth/4,frameY)
+            self:x(-frameWidth/4):zoom(0.7)
         end,
         BeginCommand=function(self)
             self:settext("Early")
             :diffusealpha(0):smooth(.5):diffusealpha(1):sleep(2):smooth(.5):diffusealpha(0)
             :queuecommand("Doot")
         end,
-		DootCommand=function(self)
-			self:GetParent():queuecommand("Doot")
-		end
-	}
+        DootCommand=function(self)
+            self:GetParent():queuecommand("Doot")
+        end
+    }
 }
+
+for i=1, #enabledTimingWindows-1 do
+    local wi = enabledTimingWindows[i]
+    local offset = getWindow(wi) * wscale
+
+    e[#e+1] = Def.Quad{
+        InitCommand=function(self)
+            self:x(-offset)
+            self:zoomto(1, frameHeight)
+            self:diffuse(color(1, 1, 1, 1))
+            self:diffusealpha(0)
+            self:sleep(2.5):smooth(.5)
+            self:diffusealpha(.3)
+        end,
+    }
+    e[#e+1] = Def.Quad{
+        InitCommand=function(self)
+            self:x(offset)
+            self:zoomto(1, frameHeight)
+            self:diffuse(color(1, 1, 1, 1))
+            self:diffusealpha(0)
+            self:sleep(2.5):smooth(.5)
+            self:diffusealpha(.3)
+        end,
+    }
+end
 
 -- Initialize bars
 for i=1,barcount do
-	e[#e+1] = smeltErrorBar(i)
+    e[#e+1] = smeltErrorBar(i)
 end
 
 return e
